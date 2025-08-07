@@ -171,6 +171,25 @@ class SensorService(object):
         ]
         
         return accel_ms2, gyro_rads
+    
+    def count_decimal_digits(self, value):
+        s = str(value)
+        if '.' not in s:
+            return 0
+        decimal_part = s.split('.')[1]
+        return len(decimal_part)
+    
+    def round_if_needed(self,value):
+        if self.count_decimal_digits(value) > 15:    
+            for precision in range(15, 7, -1):
+                rounded = round(value, precision)
+                digits = self.count_decimal_digits(rounded)
+                if digits <= 15:
+                    return rounded
+            return 0.0
+        else:
+            return value 
+
 
     def start_update(self):
         prev_temp1 = None
@@ -203,13 +222,13 @@ class SensorService(object):
                 
                 # Check for significant acceleration changes (>0.5 m/s² total change)
                 if prev_accel is None or abs(prev_accel[0] - accel[0]) + abs(prev_accel[1] - accel[1]) + abs(prev_accel[2] - accel[2]) > 0.5:
-                    data.update({10: {1: accel[0], 2: accel[1], 3: accel[2]}})
+                    data.update({10: {1: self.round_if_needed(accel[0]), 2: self.round_if_needed(accel[1]), 3: self.round_if_needed(accel[2])}})
                     prev_accel = [accel[0], accel[1], accel[2]]
                     logger.debug("Acceleration changed: X={:.3f}, Y={:.3f}, Z={:.3f} m/s²".format(accel[0], accel[1], accel[2]))
                 
                 # Check for significant gyroscope changes (>0.1 rad/s total change)
                 if prev_gyro is None or abs(prev_gyro[0] - gyro[0]) + abs(prev_gyro[1] - gyro[1]) + abs(prev_gyro[2] - gyro[2]) >= 0.1:
-                    data.update({9: {1: gyro[0], 2: gyro[1], 3: gyro[2]}})
+                    data.update({9: {1: self.round_if_needed(gyro[0]), 2: self.round_if_needed(gyro[1]), 3: self.round_if_needed(gyro[2])}})
                     prev_gyro = [gyro[0], gyro[1], gyro[2]]
                     logger.debug("Gyroscope changed: X={:.3f}, Y={:.3f}, Z={:.3f} rad/s".format(gyro[0], gyro[1], gyro[2]))
                     
@@ -264,7 +283,6 @@ class SensorService(object):
                 if prev_rgb888 is None:
                     data.update({7: {1: r, 2: g, 3: b}})
                     prev_rgb888 = rgb888
-                    logger.debug("RGB color initial: R={}, G={}, B={}".format(r, g, b))
                 else:
                     prev_r = (prev_rgb888 >> 16) & 0xFF
                     dr = abs(r - prev_r)
@@ -279,7 +297,6 @@ class SensorService(object):
                     if pow(sum((dr*dr, dg*dg, db*db)), 0.5) >= 200:
                         # data.update({7: {1: r, 2: g, 3: b}})
                         prev_rgb888 = rgb888
-                        logger.debug("RGB color changed: R={}, G={}, B={}".format(r, g, b))
 
             except Exception as e:
                 self._mark_sensor_disconnected('tcs34725')
